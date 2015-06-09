@@ -428,6 +428,39 @@ int rc_auth(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **
 	return rc_aaa(rh, client_port, send, received, msg, 1, PW_ACCESS_REQUEST);
 }
 
+/* Builds an authentication request for port id client_port with the value_pairs send and submits it to a server
+ * @param rh a handle to parsed configuration.
+ * @param client_port the client port number to use (may be zero to use any available).
+ * @param send a #VALUE_PAIR array of values (e.g., %PW_USER_NAME).
+ * @param received an allocated array of received values.
+ * @param msg must be an array of %PW_MAX_MSG_SIZE or %NULL; will contain the concatenation of any
+ *	%PW_REPLY_MESSAGE received.
+ * @param ctx the context which shall be passed to the asynchronous receive function.
+ * @return received value_pairs in @received, messages from the server in msg (if non-NULL),
+ * context for resume function in @ctx, sockfd in @ctx->sockfd and %OK_RC (0) on success
+ * negative on failure as return value.
+ * on failure an error code is called; function shall not be called again
+ * if upper layer application detects timeout on socket it shall call this function
+ * again with same context
+ */
+int rc_auth_async(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **received,
+    char *msg, SEND_CONTEXT **ctx)
+{
+
+	return rc_aaa_async(rh, client_port, send, received, msg, 1, PW_ACCESS_REQUEST, ctx);
+}
+
+/* Asynchronously receives the authentification reply from the server
+ * @param ctx the context that was set by rc_auth_async function
+ * @param received an allocated array of received values.
+ * @return received value_pairs in @received OK_RC(0) on success;
+ *			BLOCK_RC and not null @ctx on EWOULDBLOCK/EAGAIN
+ *			any other rc means failure or rejection
+ */
+int rc_auth_resume(SEND_CONTEXT **ctx, VALUE_PAIR ** received) {
+	return rc_aaa_receive_async(ctx, received, PW_ACCESS_REQUEST);
+}
+
 /** Builds an authentication request for proxying
  *
  * Builds an authentication request with the value_pairs send and submits it to a server.
@@ -459,6 +492,37 @@ int rc_auth_proxy(rc_handle *rh, VALUE_PAIR *send, VALUE_PAIR **received, char *
 int rc_acct(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send)
 {
 	return rc_aaa(rh, client_port, send, NULL, NULL, 1, PW_ACCOUNTING_REQUEST);
+}
+
+/** Builds an accounting request for port id client_port with the value_pairs at send
+ *
+ * @note NAS-IP-Address, NAS-Port and Acct-Delay-Time get filled in by this function, the rest has to be supplied.
+ *
+ * @param rh a handle to parsed configuration.
+ * @param client_port the client port number to use (may be zero to use any available).
+ * @param send a #VALUE_PAIR array of values (e.g., %PW_USER_NAME).
+ * @param ctx the context which shall be passed to the asynchronous receive function;
+ *@return received value_pairs in @received, messages from the server in msg (if non-NULL),
+ * context for resume function in @ctx, sockfd in @ctx->sockfd and %OK_RC (0) on success
+ * negative on failure as return value.
+ * on failure an error code is called; function shall not be called again
+ * if upper layer application detects timeout on socket it shall call this function
+ * again with same context
+
+ */
+int rc_acct_async(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, SEND_CONTEXT **ctx) {
+	return rc_aaa_async(rh, client_port, send, NULL, NULL, 1, PW_ACCOUNTING_REQUEST, ctx);
+}
+
+/* Asynchronously receives the accounting reply from the server
+ * @param ctx the context that was set by rc_acct_resume function
+ * @return NULL @ctx and OK_RC(0) on success;
+ *		   BLOCK_RC and not NULL @ctx on EWOULDBLOCK/EAGAIN
+ *		   any other rc means failure
+ *
+ */
+int rc_acct_resume(SEND_CONTEXT **ctx) {
+	return rc_aaa_receive_async(ctx, NULL, PW_ACCOUNTING_REQUEST);
 }
 
 /** Builds an accounting request with the value_pairs at send
